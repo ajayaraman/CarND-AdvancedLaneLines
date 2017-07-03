@@ -315,17 +315,21 @@ def fit_lane_poly(binary_warped, left_fit, right_fit, nwindows = 9):
         #else just retain old lane value
     return (left_fit, right_fit)
 
-def compute_cam_center(left_fit, right_fit, pix_to_meters, image_width):
+def compute_cam_center(pts_left, pts_right, image_width):
     #The average of the left & right intercept coefficients is the center
-    cam_center = (left_fit[-1] + right_fit[-1]) / 2
-    cam_center_to_mid = cam_center - image_width / 2.
-    #Find if the camera to right or left of center
-    if cam_center_to_mid > 0 :
-        position = 'right'
+    # Using the 10th value for x to get a point in the middle of the lane
+    idx = 200
+    lane_middle = int((pts_right[0][idx][0] - pts_left[0][idx][0])/2.)+pts_left[0][idx][0]
+    image_half_width = image_width // 2
+    laneHalfWidth = 3.7/2 # Assume avg lane width of 3.66 m
+
+    if (lane_middle-image_half_width > 0):
+        offset = ((lane_middle-image_half_width)/image_half_width * laneHalfWidth)
+        head = ("right", offset)
     else:
-        position = 'left' 
-    cam_center_to_mid = cam_center_to_mid * pix_to_meters
-    return cam_center_to_mid, position
+        offset = ((lane_middle-image_half_width)/image_half_width * laneHalfWidth)*-1
+        head = ("left", offset)
+    return head
 
 def radius_of_curvature(leftx, rightx, ploty, ym_per_pix, xm_per_pix):
     # Define y-value where we want radius of curvature
@@ -423,7 +427,7 @@ def detect_lanes(image, tracker):
         ym_per_pix = 30/binary_warped.shape[0] # meters per pixel in y dimension
         xm_per_pix = 3.7/810. # meters per pixel in x dimension
 
-        cam_center_to_mid, position = compute_cam_center(left_fit, right_fit, xm_per_pix, image.shape[1])
+        position, cam_center_to_mid = compute_cam_center(pts_left, pts_right, binary_warped.shape[1])
 
         roc = radius_of_curvature(left_fitx, right_fitx, ploty, ym_per_pix, xm_per_pix)
 
